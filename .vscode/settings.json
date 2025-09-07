@@ -55,6 +55,13 @@
         "typeinfo": "cpp",
         "variant": "cpp",
         "chrono": "cpp",
-        "future": "cpp"
+        "future": "cpp",
+        "ctime": "cpp",
+        "condition_variable": "cpp",
+        "ratio": "cpp",
+        "mutex": "cpp",
+        "semaphore": "cpp",
+        "stop_token": "cpp",
+        "thread": "cpp"
     }
 }
