@@ -14,7 +14,7 @@ namespace bitrpc{
     #define KEY_HOST_IP "ip"
     #define KEY_HOST_PORT "port"
     #define KEY_RCODE "rcode"
-    #define KEY_RESULT "result
+    #define KEY_RESULT "result"
 
     enum class MType {
         REQ_RPC = 0,

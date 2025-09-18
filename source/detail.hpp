@@ -16,7 +16,7 @@
 #include <atomic>
 #include <iomanip>
 
-namespace bitrbc
+namespace bitrpc
 {
 
 #define LDBG 0
@@ -65,7 +65,7 @@ namespace bitrbc
         /*输入：JsonValue类，要转化的string类；
         目的：将string类转化为JsonValue类
         返回：转化成功与否*/
-        static bool unserialize(Json::Value &val, std::string &body)
+        static bool unserialize(Json::Value &val, const std::string &body) // body需要用const
         {
             Json::CharReaderBuilder crb;
             std::string err;

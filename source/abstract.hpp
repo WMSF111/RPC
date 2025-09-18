@@ -13,6 +13,7 @@ namespace bitrpc{
             virtual std::string rid(){return _rid;}
             virtual void setMtype(MType mtype){_mtype = mtype;} // 小对象且可更改，会有个mtype副本
             virtual MType mtype(){return _mtype;}
+            // 功能
             // =0 意味着这些函数没有提供实现，而是要求派生类必须提供它们的具体实现。
             virtual std::string serialize() = 0; 
             virtual bool unserialize(const std::string &msg) = 0; 
