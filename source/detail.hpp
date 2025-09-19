@@ -25,13 +25,13 @@ namespace bitrpc
 
 #define LDEFAULT LINF
 
-#define LOG(level, formt, ...) {\
+#define LOG(level, format, ...) {\
     if(level >= LDEFAULT){\
         time_t t = time(NULL); \
         struct tm* lt = localtime(&t); \
-        char temp[32] = {0};\
-        strftime(temp, 31,"%m-%d %T" , lt);\
-        printf("[%s][%s %d] " formt "\n", temp, __FILE__, __LINE__, ##__VA_ARGS__);\
+        char time_tmp[32] = {0};\
+        strftime(time_tmp, 31,"%m-%d %T" , lt);\
+        fprintf(stdout, "[%s][%s:%d] " format "\n", time_tmp, __FILE__, __LINE__, ##__VA_ARGS__);\
     }\
 }//宏定义后面带##是为了可以省略该逗号及后面的参数
 
@@ -74,7 +74,7 @@ namespace bitrpc
             int ret = cr->parse(body.c_str(),body.c_str() + body.size(), &val, &err);
             if(ret == false) // 有错误
             {
-                ELOG("Json unserialize failed: %s \n" , err);
+                ELOG("Json unserialize failed: %s \n" , err.c_str());
                 return false;
             }
             return true;

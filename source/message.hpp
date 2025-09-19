@@ -50,7 +50,8 @@ namespace bitrpc{
             }
     };
 
-    class RpcRequest : public JsonRequest{ //Rpc请求，需要METHOD、PARAMS
+    //Rpc请求，需要METHOD、PARAMS
+    class RpcRequest : public JsonRequest{ 
         public:
             using ptr = std::shared_ptr<RpcRequest>;
             virtual bool check() override {
@@ -81,7 +82,9 @@ namespace bitrpc{
             }
     };
 
-    class TopicRequest : public JsonRequest { // 主题请求，需要TOPIC、OPTYPE、TOPIC_MSG
+    // 主题请求，主题发布
+    // 需要TOPIC、OPTYPE、TOPIC_MSG（只有主题发布需要）
+    class TopicRequest : public JsonRequest { 
         public:
             using ptr = std::shared_ptr<TopicRequest>;
             virtual bool check() override {
@@ -126,7 +129,9 @@ namespace bitrpc{
 
     };
     
-    class ServiceRequest : public JsonRequest { // 服务请求， 需要METHOD、OPTYPE、HOST（IP、PORT）
+    // 服务请求，服务注册、服务发现、服务上线、服务下线
+    // 需要METHOD、OPTYPE、HOST（IP、PORT，只有SERVICE_DISCOVERY不需要， 因为请求时不知道有哪些service）
+    class ServiceRequest : public JsonRequest { 
         public:
             using ptr = std::shared_ptr<ServiceRequest>;
             virtual bool check() override {
@@ -180,7 +185,9 @@ namespace bitrpc{
             }
     };
     
-    class RpcResponse : public JsonResponse { //Rpc响应，需要RCODE、RESULT
+    // Rpc响应，返回响应结果。
+    // 需要RESULT
+    class RpcResponse : public JsonResponse { 
         public:
             using ptr = std::shared_ptr<RpcResponse>;
             virtual bool check() override {
@@ -204,6 +211,8 @@ namespace bitrpc{
     };
 
     class ServiceResponse : public JsonResponse { //服务响应，包含RCODE、OPTYPE、METHOD、HOST
+    // 注册、上线、下线只需要RCODE, 服务发现都需要
+    // OPTYPE用于看响应类型
         public:
             using ptr = std::shared_ptr<ServiceResponse>;
             virtual bool check() override {
@@ -234,6 +243,7 @@ namespace bitrpc{
             void setMethod(const std::string &method) {
                 _body[KEY_METHOD] = method;
             }
+            //因为ServiceResponse可能会有多个服务器
             void setHost(std::vector<Address> addrs) {
                 for (auto &addr : addrs) { // 循环设置HOST
                     Json::Value val;
@@ -254,5 +264,33 @@ namespace bitrpc{
                 return addrs;
             }
     };
+
+    // 消息对象工厂
+    // 提供了一个集中管理对象创建的地方，避免了代码中到处硬编码对象创建逻辑的麻烦。
+    class MessageFactory{
+        public:
+        // 根据MType类型创建对应对象
+            static BaseMessage::ptr create(MType mtype){
+                switch(mtype) {
+                    // 返回一个mtype类型对象， 但用BaseMessage::ptr指针接受
+                    //后续还需要转化为对应派生类指针
+                    case MType::REQ_RPC : return std::make_shared<RpcRequest>();
+                    case MType::RSP_RPC : return std::make_shared<RpcResponse>();
+                    case MType::REQ_TOPIC : return std::make_shared<TopicRequest>();
+                    case MType::RSP_TOPIC : return std::make_shared<TopicResponse>();
+                    case MType::REQ_SERVICE : return std::make_shared<ServiceRequest>();
+                    case MType::RSP_SERVICE : return std::make_shared<ServiceResponse>();
+                }
+                return BaseMessage::ptr();
+            }
+            // 当后期需要传入参数时，可以用该方法创造对象
+            // 根据具体类型T创建具体对象T
+            template<typename T, typename ...Args>
+            // 不能返回BaseMessage::ptr类型，因为父类指针无法转化为子类指针（子类指针不能指向父类对象）
+            // std::dynamic pointer cast<bitrpc::RpcRequest>(bmp);可以转换
+            static std::shared_ptr<T> create(Args&& ...args) {
+                return std::make_shared<T>(std::forward(args)...);
+            }
+        };
 
 }
