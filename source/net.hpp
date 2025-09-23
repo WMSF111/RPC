@@ -54,11 +54,13 @@ namespace bitrpc{
         public:
             using ptr = std::shared_ptr<BaseProtocol>;
             virtual bool canProcessed(const BaseBuffer::ptr &buf){
-                int32_t total_len = buf->peekInt32();
+                int32_t total_len = buf->peekInt32(); // len
+                // 可使用内存小于需要的内存 len + len的值
                 if(buf->readableSize() < (total_len + lenFieldsLength)) return false;
                 return true;
             }; //判断是否能处理
 
+            /*将缓冲区数据赋给msg*/
             virtual bool onMessage(const BaseBuffer::ptr &buf, BaseMessage::ptr &msg){
                 //当调用onMessage的时候，默认认为缓冲区中的数据足够一条完整的消息
                 int32_t total_len = buf->peekInt32(); // 读综合长度
@@ -116,7 +118,8 @@ namespace bitrpc{
             }
     };
 
-    class MuduoConnection : public BaseConnection {
+    /*建立Muduo的链接，其通讯协议为_protocol*/
+    class MuduoConnection : public BaseConnection { // Connect方法是使用Muduo实现的
         public:
             using ptr = std::shared_ptr<MuduoConnection>;
             MuduoConnection(const muduo::net::TcpConnectionPtr &conn, 
@@ -145,6 +148,202 @@ namespace bitrpc{
             template<typename ...Args>
             static BaseConnection::ptr create(Args&& ...args) {
                 return std::make_shared<MuduoConnection>(std::forward<Args>(args)...);
+            }
+    };
+
+    class MuduoServer : public BaseServer{ // 通过Muduo建立Server
+        public:
+            using ptr = std::shared_ptr<MuduoServer>;
+            MuduoServer(int port): 
+            _server(&_evenloop, muduo::net::InetAddress(port),
+                "MuduoServer", muduo::net::TcpServer::kReusePort),
+            _protocol(ProtocolFactory::create()){} // protocol需要提前创建，否则会报错
+        void start(){
+           //设置连接事件（连接建立/管理）的回调
+            _server.setConnectionCallback(std::bind(&MuduoServer::onConnection, this, std::placeholders::_1));
+            //设置连接消息的回调
+            _server.setMessageCallback(std::bind(&MuduoServer::onMessage, this, 
+                    std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+            _server.start(); //开始监听
+            _evenloop.loop(); //事件死循环
+        }
+    private:
+        void onConnection(const muduo::net::TcpConnectionPtr &conn)
+        {
+            if(conn->connected()){
+                std::cout << "连接建立！\n";
+                auto muduo_conn = ConnectionFactory::create(conn, _protocol); //建立链接关系
+                {
+                    std::unique_lock<std::mutex> lock(_mutex); // 建立动态锁，出作用域就释放
+                    _conns.insert(std::make_pair(conn, muduo_conn)); //将建立的链接插入_conns
+                }
+                // 如果_cb_connection不为空，则调用它，并将 muduo_conn作为参数传递给它
+                if(_cb_connection) _cb_connection(muduo_conn);
+            }else{
+                std::cout <<"连接断开！\n";
+                BaseConnection::ptr muduo_conn;
+                {
+                    std::unique_lock<std::mutex> lock(_mutex); // 建立动态锁，出作用域就释放
+                    auto it = _conns.find(conn);
+                    if(it == _conns.end()) return;
+                    muduo_conn = it->second;
+                    _conns.erase(conn);
+                }if(_cb_close) _cb_close(muduo_conn);
+                }
+        }
+
+        void onMessage(const muduo::net::TcpConnectionPtr &conn, muduo::net::Buffer *buf, muduo::Timestamp)
+        {
+            DLOG("连接有数据到来，开始处理！");
+            auto base_buf = BufferFactory::create(buf); //buf中有很多数据，先封装
+            while(1) {
+                // 1. 检查缓冲区空间是否足够
+                if (_protocol->canProcessed(base_buf) == false) { //看能否处理base_buf
+                    //缓冲区数据不足
+                    if (base_buf->readableSize() > maxDataSize) { // 缓冲区数据过多
+                            conn->shutdown();
+                            ELOG("缓冲区中数据过大！");
+                            return ;
+                        }
+                        //DLOG("数据量不足！");
+                        break;
+                }
+                // 2. 将缓冲区信息存到msg中
+                //DLOG("缓冲区中数据可处理！");
+                BaseMessage::ptr msg; // 要发送的信息
+                bool ret = _protocol->onMessage(base_buf, msg); // 把basebuf信息发给msg
+                if (ret == false) { // 数据有问题
+                    conn->shutdown();
+                    ELOG("缓冲区中数据错误！");
+                    return ;
+                }
+                // 3. 给conn的客户端发送msg
+                //DLOG("消息反序列化成功！")
+                BaseConnection::ptr base_conn; //查找对应base_conn
+                {
+                    std::unique_lock<std::mutex> lock(_mutex);
+                    auto it = _conns.find(conn);
+                    if (it == _conns.end()) {
+                        conn->shutdown();
+                        return;
+                    }
+                    base_conn = it->second;
+                }
+                //DLOG("调用回调函数进行消息处理！");
+                if (_cb_message) _cb_message(base_conn, msg);
+            }
+        }
+        private:
+            const size_t maxDataSize = (1 << 16);
+            muduo::net::TcpServer _server;
+            muduo::net::EventLoop _evenloop;
+            std::mutex _mutex;
+            BaseProtocol::ptr _protocol; // ConnectionFactory需要_protocol和_conn
+            // ConnectionFactory对BaseConnection进行创建，MuduoConnection中_conn是TcpConnectionPtr
+            std::unordered_map<muduo::net::TcpConnectionPtr, BaseConnection::ptr> _conns;
+    };
+    class ServerFactory {
+        public:
+            template<typename ...Args>
+            static BaseServer::ptr create(Args&& ...args) {
+                return std::make_shared<MuduoServer>(std::forward<Args>(args)...);
+            }
+    };
+
+    class MuduoClient : public BaseClient {
+        public:
+            using ptr = std::shared_ptr<MuduoClient>;
+            MuduoClient(const std::string &sip, int sport):
+                _protocol(ProtocolFactory::create()),
+                _baseloop(_loopthread.startLoop()),
+                _downlatch(1), //初始化计数器为1，因为为0时才会唤醒
+                _client(_baseloop, muduo::net::InetAddress(sip, sport), "MuduoClient"){}
+            virtual void connect() override {
+                DLOG("设置回调函数，连接服务器");
+                //设置连接事件（连接建立/管理）的回调
+                _client.setConnectionCallback(std::bind(&MuduoClient::onConnection, this, std::placeholders::_1));
+                //设置连接消息的回调
+                _client.setMessageCallback(std::bind(&MuduoClient::onMessage, this, 
+                    std::placeholders::_1, std::placeholders::_2, std::placeholders::_3));
+                
+                //连接服务器
+                _client.connect();
+                _downlatch.wait();
+                DLOG("连接服务器成功！");
+            }
+            virtual void shutdown() override {
+                return _client.disconnect();
+            }
+            virtual bool send(const BaseMessage::ptr &msg) override { 
+                if (connected() == false) {
+                    ELOG("连接已断开！");
+                    return false;
+                }
+                _conn->send(msg);
+            }
+            virtual BaseConnection::ptr connection() override { // 返回链接的对象
+                return _conn;
+            }
+            virtual bool connected() { // 判断链接状态
+                return (_conn && _conn->connected()); // 客户端只有一个链接
+            }
+        private:
+            /*建立_conn连接， conn为要建立的链接指针*/
+            void onConnection(const muduo::net::TcpConnectionPtr &conn) { 
+                if (conn->connected()) {
+                    std::cout << "连接建立！\n";
+                    _downlatch.countDown();//计数--，为0时唤醒阻塞
+                    _conn = ConnectionFactory::create(conn, _protocol);
+                }else {
+                    std::cout << "连接断开！\n";
+                    _conn.reset();
+                }
+            }
+            /*给链接的服务端发送消息*/
+            void onMessage(const muduo::net::TcpConnectionPtr &conn, muduo::net::Buffer *buf, muduo::Timestamp){
+                DLOG("连接有数据到来，开始处理！");
+                auto base_buf = BufferFactory::create(buf);
+                while(1) {
+                    /*1.判断缓冲区空间是否充足*/
+                    if (_protocol->canProcessed(base_buf) == false) {
+                        //数据不足
+                        if (base_buf->readableSize() > maxDataSize) {
+                            conn->shutdown();
+                            ELOG("缓冲区中数据过大！");
+                            return ;
+                        }
+                        //DLOG("数据量不足！");
+                        break;
+                    }
+                    /*2. 将缓冲区数据处理成msg*/
+                    //DLOG("缓冲区中数据可处理！");
+                    BaseMessage::ptr msg;
+                    bool ret = _protocol->onMessage(base_buf, msg);
+                    if (ret == false) {
+                        conn->shutdown();
+                        ELOG("缓冲区中数据错误！");
+                        return ;
+                    }
+                    /*3.给链接的_conn发送消息*/
+                    //DLOG("缓冲区中数据解析完毕，调用回调函数进行处理！");
+                    if (_cb_message) _cb_message(_conn, msg);
+                }
+            }
+        private:
+            const size_t maxDataSize = (1 << 16);
+            BaseProtocol::ptr _protocol; // 通讯协议
+            BaseConnection::ptr _conn; //确保链接建立成功
+            muduo::CountDownLatch _downlatch; // 解决阻塞问题
+            muduo::net::EventLoopThread _loopthread; // 解决死循环问题，无法发送数据 
+            muduo::net::EventLoop *_baseloop; //事件循环（死循环）,通过指针可以灵活地引用不同类型的EventLoop对象
+            muduo::net::TcpClient _client;
+    };
+    
+    class ClientFactory {
+        public:
+            template<typename ...Args>
+            static BaseClient::ptr create(Args&& ...args) {
+                return std::make_shared<MuduoClient>(std::forward<Args>(args)...);
             }
     };
 }
