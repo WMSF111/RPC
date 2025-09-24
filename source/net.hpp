@@ -66,7 +66,7 @@ namespace bitrpc{
             /*将缓冲区数据赋给msg*/
             virtual bool onMessage(const BaseBuffer::ptr &buf, BaseMessage::ptr &msg){
                 //当调用onMessage的时候，默认认为缓冲区中的数据足够一条完整的消息
-                int32_t total_len = buf->peekInt32(); // 读综合长度
+                int32_t total_len = buf->readInt32(); // 读综合长度
                 MType mtype =  (MType)buf->readInt32(); // 读取数据类型
                 int32_t idlen = buf->readInt32(); // 读取id长度
                 int32_t body_len = total_len - idlen - idlenFieldsLength - mtypeFieldsLength; 
@@ -92,12 +92,12 @@ namespace bitrpc{
             virtual std::string serialize(const BaseMessage::ptr &msg) override{
                 // |--Len--|--mtype--|--idlen--|--id--|--body--|
                 std::string body = msg->serialize();
-                DLOG("LV协议serialize消息body:%s", body.c_str());
+                // DLOG("LV协议serialize消息body:%s", body.c_str());
                 std::string id = msg->rid();
                 // htonl:将主机字节顺序（通常是小端字节序）转换为网络字节顺序（大端字节序）
                 auto mtype = htonl((int32_t)msg->mtype());
                 int32_t idlen = htonl(id.size());
-                int32_t h_total_len = mtypeFieldsLength + idlenFieldsLength + id.size() + body.size();
+                int32_t h_total_len =  mtypeFieldsLength + idlenFieldsLength + id.size() + body.size();
                 int32_t n_total_len = htonl(h_total_len); // 转化后变得很大
                 std::string result;
                 // 计算和处理数据时，仍然处于主机字节顺序，将数据写入网络传输时，数据需要转化为网络字节顺序。
@@ -108,10 +108,10 @@ namespace bitrpc{
                 // 字符串本身是按字符的字节序列存储的，而字符（例如 ASCII 字符）在不同字节序的机器上通常是一样的
                 result.append(id);
                 result.append(body);
-                for (char c : result) {
-                    printf("%02x ", (unsigned char)c);
-                }
-                DLOG("LV协议serialize消息result:%s", result.c_str());
+                // for (char c : result) {
+                //     printf("%02x ", (unsigned char)c);
+                // }
+                // DLOG("LV协议serialize消息result:%s", result.c_str());
                 fflush(stdout);  // 强制刷新输出缓冲区
                 return result;
             }; //对消息序列化
@@ -139,7 +139,7 @@ namespace bitrpc{
 
             virtual void send(const BaseMessage::ptr &msg) override {
                 std::string body = _protocol->serialize(msg); //按照协议转化
-                DLOG("MuduoConnectionsend消息body:%s", body.c_str());
+                // DLOG("MuduoConnectionsend消息body:%s", body.c_str());
                 _conn->send(body);
             }
 
