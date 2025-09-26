@@ -67,5 +67,6 @@
         "csignal": "cpp",
         "any": "cpp",
         "codecvt": "cpp"
-    }
+    },
+    "C_Cpp.errorSquiggles": "enabled"
 }

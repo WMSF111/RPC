@@ -1,13 +1,13 @@
 #include<thread>
 #include "dispatcher.hpp"
 // 客户端收到响应
-void onResponceRpc(const bitrpc::BaseConnection::ptr& conn, bitrpc::BaseMessage::ptr& msg){
+void onResponceRpc(const bitrpc::BaseConnection::ptr& conn, bitrpc::RpcResponse::ptr& msg){
     std::cout << "收到了RPC响应" << std::endl;
     std::string body = msg->serialize(); // 解析成string数据
     std::cout << body<< std::endl;
 }
 
-void onResponceTopic(const bitrpc::BaseConnection::ptr& conn, bitrpc::BaseMessage::ptr& msg){
+void onResponceTopic(const bitrpc::BaseConnection::ptr& conn, bitrpc::TopicResponse::ptr& msg){
     std::cout << "收到了TOPIC响应" << std::endl;
     std::string body = msg->serialize(); // 解析成string数据
     std::cout << body<< std::endl;
@@ -16,8 +16,8 @@ void onResponceTopic(const bitrpc::BaseConnection::ptr& conn, bitrpc::BaseMessag
 int main()
 {
     auto dispatcher = std::make_shared<bitrpc::Dispatcher>();
-    dispatcher->registerHandler(bitrpc::MType::RSP_RPC, onResponceRpc); //收到了响应的回调
-    dispatcher->registerHandler(bitrpc::MType::RSP_TOPIC, onResponceTopic);
+    dispatcher->registerHandler<bitrpc::RpcResponse>(bitrpc::MType::RSP_RPC, onResponceRpc); //收到了响应的回调
+    dispatcher->registerHandler<bitrpc::TopicResponse>(bitrpc::MType::RSP_TOPIC, onResponceTopic);
 
     auto client = bitrpc::ClientFactory::create("127.0.0.1", 9090);
     // message_cb 是一个回调函数对象.

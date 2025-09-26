@@ -1,7 +1,8 @@
 #include "dispatcher.hpp"
 
 // 收到请求
-void onRequestRcp(const bitrpc::BaseConnection::ptr& conn, bitrpc::BaseMessage::ptr& msg){
+void onRequestRcp(const bitrpc::BaseConnection::ptr& conn, bitrpc::RpcRequest::ptr& msg){
+    std::cout << "收到了RPC请求" << std::endl;
     std::string body = msg->serialize(); // 解析成string数据
     std::cout << body<< std::endl;
     auto rpc_req = bitrpc::MessageFactory::create<bitrpc::RpcResponse>(); // 建立应答
@@ -12,7 +13,8 @@ void onRequestRcp(const bitrpc::BaseConnection::ptr& conn, bitrpc::BaseMessage::
     conn->send(rpc_req); // 发送应答
 }
 
-void onRequestTopic(const bitrpc::BaseConnection::ptr& conn, bitrpc::BaseMessage::ptr& msg){
+void onRequestTopic(const bitrpc::BaseConnection::ptr& conn, bitrpc::TopicRequest::ptr& msg){
+    std::cout << "收到了TOPIC请求" << std::endl;
     std::string body = msg->serialize(); // 解析成string数据
     std::cout << body<< std::endl;
     auto rpc_req = bitrpc::MessageFactory::create<bitrpc::TopicResponse>(); // 建立应答
@@ -25,8 +27,8 @@ void onRequestTopic(const bitrpc::BaseConnection::ptr& conn, bitrpc::BaseMessage
 int main()
 {
     auto dispatcher = std::make_shared<bitrpc::Dispatcher>();
-    dispatcher->registerHandler(bitrpc::MType::REQ_RPC, onRequestRcp); // 收到了请求的回调
-    dispatcher->registerHandler(bitrpc::MType::REQ_TOPIC, onRequestTopic);
+    dispatcher->registerHandler<bitrpc::RpcRequest>(bitrpc::MType::REQ_RPC, onRequestRcp); // 收到了请求的回调
+    dispatcher->registerHandler<bitrpc::TopicRequest>(bitrpc::MType::REQ_TOPIC, onRequestTopic);
     auto message_cb = std::bind(&bitrpc::Dispatcher::onMessage, dispatcher.get(),
             std::placeholders::_1, std::placeholders::_2);
     auto server = bitrpc::ServerFactory::create(9090);
