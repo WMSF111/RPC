@@ -23,8 +23,51 @@ namespace bitrpc{
                     _method_name(std::move(mname)),_callback(std::move(handler)), 
                     _params_desc(std::move(desc)), _return_type(vtype)
                 {} // 构造：需要传入方法名称
-                bool ParamsChek(const Json::Value &params){ }//用于检查参数类型是否正确
+                const std::string &method(){ return _method_name;}
+                ///针对收到的请求中的参数进行校验
+                bool ParamsCheck(const Json::Value &params){//用于检查参数类型是否正确
+                //对params进行参数校验---判断所描述的参数字段是否存在，类型是否一致
+                    for(auto &desc : _params_desc)
+                    {
+                        if(params.isMember(desc.first) == false) //判断对象是否存在
+                        {
+                            ELOG("参数字段完整性校验失败！%s 字段缺失！", desc.first.c_str());
+                            return false;
+                        }
+                        if(check(desc.second, params[desc.first]) == false) //判断对象的类型是否正确
+                        {
+                            ELOG("参数字段完整性校验失败！%s 字段缺失！", desc.first.c_str());
+                            return false;
+                        }
+                    }
+                    return true;
+                 }
+                 bool callbackcheck(const Json::Value& val, Json::Value & result)
+                 {
+                    _callback(val, result);
+                    if(rtcheck(result) == false)
+                    {
+                        ELOG("回调处理函数中的响应信息校验失败！");
+                        return false;
+                    }
+                    return true;
+                 }
             private:
+                bool rtcheck(const Json::Value &val)
+                {
+                    return check(_return_type, val);
+                }
+                bool check(const VType &vtype, const Json::Value &val)
+                {
+                    switch(vtype){
+                        case VType::BOOL : return val.isBool(); // bool类型
+                        case VType::INTEGRAL : return val.isIntegral(); //整数类型
+                        case VType::NUMERIC : return val.isNumeric(); //浮点数类型
+                        case VType::STRING : return val.isString(); // 字符串类型
+                        case VType::ARRAY : return val.isArray(); // 数组类型
+                        case VType::OBJECT : return val.isObject(); // 对象类型
+                    }
+                }
                 std::string _method_name;   // 方法名称
                 ServiceCallback _callback;  // 实际的业务回调函数
                 std::vector<ParamsDescribe> _params_desc; // 参数字段格式描述
@@ -33,11 +76,33 @@ namespace bitrpc{
 
         class SDescribeFactory { // 外部能够构造服务描述
             public:
+                void setMethodName(std::string &method)
+                {
+                    _method_name = method;
+                }
+                void setParamsDesc(const std::string &pname, VType vtype)
+                {
+                    _params_desc.push_back(ServiceDescribe::ParamsDescribe(pname, vtype));
+                }
+                void setCallback(const ServiceDescribe::ServiceCallback &cb) {
+                    _callback = cb;
+                }
+                void setReturnType(VType &type)
+                {
+                    _return_type = type;
+                }
                 ServiceDescribe::ptr build() {// 生产服务描述
-
+                // 要构造智能指针方便管理
+                // _method_name是一个左值（即一个已经存在的对象）,std::move将它转化为右值引用.
+                // 表示我们不再需要这个原始的 _method_name 对象，并且它的资源可以被转移（而非拷贝）。
+                    return std::make_shared<ServiceDescribe>(std::move(_method_name), 
+                        std::move(_params_desc), _return_type, std::move(_callback));
                 }
             private:
-
+                std::string _method_name;   // 方法名称
+                ServiceDescribe::ServiceCallback _callback;  // 实际的业务回调函数
+                std::vector<ServiceDescribe::ParamsDescribe> _params_desc; // 参数字段格式描述
+                VType _return_type; //结果作为返回值类型的描述
         };
 
         class ServiceManage{ // 服务管理类
