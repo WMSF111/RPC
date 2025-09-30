@@ -105,12 +105,27 @@ namespace bitrpc{
                 VType _return_type; //结果作为返回值类型的描述
         };
 
-        class ServiceManage{ // 服务管理类
+        class ServiceManager{ // 服务管理类
             public:
-                using ptr = std::shared_ptr<ServiceManage>;
-                ServiceDescribe::ptr create(){} // 增
-                ServiceDescribe::ptr select(){} // 查
-                void remove(){} // 删
+                using ptr = std::shared_ptr<ServiceManager>;
+                void insert(const ServiceDescribe::ptr &desc){// 增
+                    std::unique_lock<std::mutex> lock(_mutex);
+                    _services.insert(std::make_pair(desc->method(), desc));
+                } 
+                ServiceDescribe::ptr select(const std::string &method_name){// 查
+                    std::unique_lock<std::mutex> lock(_mutex);
+                    auto it = _services.find(method_name);
+                    if(it == _services.end())
+                    {
+                        ELOG("找不到Method对应的Service！");
+                        return ServiceDescribe::ptr();
+                    }
+                    return it->second;
+                } 
+                void remove(const std::string &method_name){// 删
+                    std::unique_lock<std::mutex> lock(_mutex);
+                    _services.erase(method_name);
+                } 
             private:
                 std::mutex _mutex;
                 std::unordered_map<std::string, ServiceDescribe::ptr> _services;// 提供的服务描述
@@ -120,20 +135,49 @@ namespace bitrpc{
             //服务注册、rpc请求回调函数
             public:
                 using ptr = std::shared_ptr<RpcRouter>;
+                RpcRouter(): _service_manager(std::make_shared<ServiceManager>()){}
             //使用智能指针：避免拷贝、管理资源、引用计数
             //使用引用&：避免拷贝、允许你在函数内修改指针的值，而直接传递指针会使得无法修改原指针
                 void onRequest(const BaseConnection::ptr &conn, RpcRequest::ptr &request){
                     //1.查询客户端请求方法描述，判断服务端是否能提供服务
+                    auto service = _service_manager->select(request->method()); //查
+                    if (service.get() == nullptr) {
+                        ELOG("%s 服务未找到！", request->method().c_str());
+                        // 不仅后端需要看到错误，还需要做出响应
+                        return response(conn, request, Json::Value(), RCode::RCODE_NOT_FOUND_SERVICE);
+                    }
                     //2.参数校验，确定是否能提供服务
+                    if (service->ParamsCheck(request->params()) == false) {
+                        ELOG("%s 参数校验失败！ ", request->method().c_str());
+                        return response(conn, request, Json::Value(), RCode::RCODE_INVALID_PARAMS);
+                    }
                     //3.调用业务回调函数进行处理
+                    Json::Value result;
+                    bool ret = service->callbackcheck(request->params(), result);
+                    if (ret == false) {
+                        ELOG("%s 服务参数校验失败！", request->method().c_str());
+                        return response(conn, request, Json::Value(), RCode::RCODE_INTERNAL_ERROR);
+                    }
                     //4.处理完毕得到结果，组织响应，向客户端发送
+                    return response(conn, request, result, RCode::RCODE_OK);
                 } //用于提供rpc请求回调
 
                 void registerMethod(const ServiceDescribe::ptr &service){// 服务注册
                     // 需要传入方法的参数描述， 选择用参数描述对象更方便
+                    _service_manager->insert(service);
                 }
             private:
-                ServiceManage::ptr _service_manager; //服务管理
+                void response(const BaseConnection::ptr &conn,  // 响应发送
+                    const RpcRequest::ptr &req, 
+                    const Json::Value &res, RCode rcode) {
+                    auto msg = MessageFactory::create<RpcResponse>();
+                    msg->setID(req->rid());
+                    msg->setMtype(bitrpc::MType::RSP_RPC);
+                    msg->setRCode(rcode);
+                    msg->setResult(res);
+                    conn->send(msg);
+                }
+                ServiceManager::ptr _service_manager; //服务管理
         };
     }
 }
