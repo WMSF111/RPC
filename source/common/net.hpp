@@ -12,6 +12,13 @@
 #include <mutex>
 #include <unordered_map>
 
+/* 使用Muduo进行网络通信的实现
+• MuduoBuffer 
+• MuduoProtocol 
+• MuduoConnection 
+• MuduoServer 
+• MuduoClient 
+*/
 
 
 namespace bitrpc{
