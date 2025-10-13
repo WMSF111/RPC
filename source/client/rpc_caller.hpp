@@ -1,3 +1,4 @@
+/*针对RPC请求进行处理*/
 #include "requestor.hpp"
 
 namespace bitrpc{
@@ -10,6 +11,8 @@ namespace bitrpc{
                 using JsonAsyncResponse = std::future<Json::Value>;
                 using JsonResponseCallback = std::function<void(const Json::Value&)>; //注意要加上&
                 RpcCaller(const Requestor::ptr &requestor) : _requestor(requestor){}
+                //requestor中的处理是针对BaseMessage进行处理的
+                //用于在rpccaller中针对结果的处理是针对 RpcResponse里边的result进行的
                 // 同步
                 bool call(const BaseConnection::ptr &conn, const std::string &method,
                         const Json::Value &params, Json::Value &result){
