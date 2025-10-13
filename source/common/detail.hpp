@@ -85,6 +85,7 @@ namespace bitrpc
     {
         public:
             static std::string uuid()
+            // 构造一个随机ID
             {
                 std::stringstream ss; // 构建返回的string
                 std::random_device rd;// 1.构造一个机器随机数对象（种子）
