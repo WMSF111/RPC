@@ -26,6 +26,7 @@ void onRequestTopic(const bitrpc::BaseConnection::ptr& conn, bitrpc::TopicReques
 
 int main()
 {
+    
     auto dispatcher = std::make_shared<bitrpc::Dispatcher>();
     dispatcher->registerHandler<bitrpc::RpcRequest>(bitrpc::MType::REQ_RPC, onRequestRcp); // 收到了请求的回调
     dispatcher->registerHandler<bitrpc::TopicRequest>(bitrpc::MType::REQ_TOPIC, onRequestTopic);

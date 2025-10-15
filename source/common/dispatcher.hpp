@@ -1,4 +1,6 @@
 #pragma once
+
+/*建立消息类型与业务回调函数的映射关系*/
 #include "net.hpp"
 #include "message.hpp"
 

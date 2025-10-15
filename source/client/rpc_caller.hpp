@@ -1,3 +1,4 @@
+#pragma once
 /*针对RPC请求进行处理*/
 #include "requestor.hpp"
 

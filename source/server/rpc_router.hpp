@@ -1,3 +1,16 @@
+#pragma once
+
+/*提供服务端rpc请求
+1. enum class VType ：提供的参数类型
+2. ServiceDescribe ：描述一个服务的基本信息（方法名、参数类型、回调函数等）以及参数和返回值的校验。
+                    ServiceCallback 业务回调函数
+                    vector<ParamsDescribe>：保存参数描述
+3. SDescribeFactory ：构造服务描述的工厂类，方便创建服务描述对象。
+                    vector<ServiceDescribe::ParamsDescribe>，用于构造ServiceDescribe
+4. ServiceManager ：服务管理类，负责注册、查询和删除服务。构造map映射ServiceDescribe::ptr
+5. RpcRouter ：处理客户端请求的路由类，负责服务的查找、参数校验、回调处理和响应发送。ServiceManager是其私有参数
+*/
+
 #include "../common/message.hpp"
 #include "../common/net.hpp"
 
@@ -76,7 +89,7 @@ namespace bitrpc{
 
         class SDescribeFactory { // 外部能够构造服务描述
             public:
-                void setMethodName(std::string &method)
+                void setMethodName(const std::string &method)
                 {
                     _method_name = method;
                 }
@@ -87,7 +100,7 @@ namespace bitrpc{
                 void setCallback(const ServiceDescribe::ServiceCallback &cb) {
                     _callback = cb;
                 }
-                void setReturnType(VType &type)
+                void setReturnType(const VType &type)
                 {
                     _return_type = type;
                 }
@@ -177,6 +190,7 @@ namespace bitrpc{
                     msg->setResult(res);
                     conn->send(msg);
                 }
+            private:
                 ServiceManager::ptr _service_manager; //服务管理
         };
     }
