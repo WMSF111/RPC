@@ -28,6 +28,7 @@ namespace bitrpc {
         public:
             using ptr = std::shared_ptr<Dispatcher>;
             template<typename T>
+            //这里的Callback输入参数是BaseMessage
             void registerHandler(MType mtype, const typename CallbackT<T>::MessageCallback &handler) {
                 std::unique_lock<std::mutex> lock(_mutex);
                 auto cb = std::make_shared<CallbackT<T>>(handler);

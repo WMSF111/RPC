@@ -1,5 +1,11 @@
 #pragma once
-/*针对RPC请求进行处理*/
+/*client端针对RPC请求进行处理
+class RpcCaller：
+    1. call(const BaseConnection::ptr, const std::string &method, const Json::Value , Json::Value)
+        针对 RpcResponse里边的result进行的请求发送
+        分为异步、同步、回调
+私有成员：Requestor::ptr _requestor ：该模块是针对_requestor的rpc
+*/
 #include "requestor.hpp"
 
 namespace bitrpc{
@@ -14,8 +20,8 @@ namespace bitrpc{
                 
                 RpcCaller(const Requestor::ptr &requestor) : _requestor(requestor){}
 
-                //requestor中的send处理是针对BaseMessage进行处理的
-                //用于在rpccaller中针对结果的处理是针对 RpcResponse里边的result进行的
+                // requestor中的send处理是针对BaseMessage进行处理的
+                // 用于在rpccaller中针对结果的处理是针对 RpcResponse里边的result进行的
                 // 同步
                 // BaseConnection是一个基类，可能会有多个派生类。通过使用智能指针，可以利用多态性，传递基类指针指向派生类的对象。
                 bool call(const BaseConnection::ptr &conn, const std::string &method,

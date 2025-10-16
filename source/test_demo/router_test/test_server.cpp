@@ -11,7 +11,7 @@ void add(const Json::Value &req, Json::Value &rsp)
 
 int main()
 {
-//一、提供的服务
+//一、注册提供的服务
     //1.构造负责处理客户端请求的路由类(注册具体提供的服务)
     // 允许多个智能指针共享对对象的所有权，适用于多地方共享资源的情况；
     auto router = std::make_shared<bitrpc::server::RpcRouter>();
@@ -34,7 +34,7 @@ int main()
     //建立消息类型与回调函数映射关系
     auto dispatcher = std::make_shared<bitrpc::Dispatcher>();
     dispatcher->registerHandler<bitrpc::RpcRequest>(bitrpc::MType::REQ_RPC, cb); // 收到了请求的回调
-    //3.dispatcher从server的回调函数获取的msg（1.server收到消息通过dispatcher处理）
+    //3.将dispatcher回调注册到server中（1.server收到消息通过dispatcher处理）
     auto message_cb = std::bind(&bitrpc::Dispatcher::onMessage, dispatcher.get(),
             std::placeholders::_1, std::placeholders::_2);
     auto server = bitrpc::ServerFactory::create(9090);

@@ -1,5 +1,11 @@
 #pragma once
-/*针对所有请求进行处理*/
+/*客户端针对所有请求进行处理
+包含：class Requestor，构造请求
+    1. onResponse: 接收到响应后的回调函数
+    2. send(BaseConnection::ptr, const BaseMessage::ptr , 回复)：发送请求（有多种请求，用base）
+    3. 私有构造了_request_desc的增删查
+成员：unordered_map<std::string, RequestDescribe::ptr> _request_desc：保存id及对应的请求
+*/
 #include "../common/message.hpp"
 #include "../common/net.hpp"
 #include<future>
@@ -23,6 +29,7 @@ namespace bitrpc{
                 };
                 
                 //接收到响应的回调函数
+                // 这个回调函数信息类型为BaseMessage
                 void onResponse(const BaseConnection::ptr &conn, BaseMessage::ptr &msg)
                 {
                     std::string rid = msg->rid();
