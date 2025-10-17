@@ -27,10 +27,12 @@ namespace bitrpc{
 
         class ServiceDescribe{ //服务描述
             public:
+                //定义一个智能指针
                 using ptr = std::shared_ptr<ServiceDescribe>;
                 // 传入：请求和响应
                 using ServiceCallback = std::function<void(const Json::Value&, Json::Value &)>; //回调函数
                 using ParamsDescribe = std::pair<std::string, VType>; //用于确定方法对应的类型
+                // 右值属性会产生内部资源交换不能使用const
                 ServiceDescribe(std::string &&mname, std::vector<ParamsDescribe> &&desc, 
                     VType vtype, ServiceCallback &&handler) : 
                     _method_name(std::move(mname)),_callback(std::move(handler)), 
@@ -80,6 +82,7 @@ namespace bitrpc{
                         case VType::ARRAY : return val.isArray(); // 数组类型
                         case VType::OBJECT : return val.isObject(); // 对象类型
                     }
+                    return false;
                 }
                 std::string _method_name;   // 方法名称
                 ServiceCallback _callback;  // 实际的业务回调函数

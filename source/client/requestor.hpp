@@ -60,7 +60,7 @@ namespace bitrpc{
                     async_rsp = rdp->response.get_future(); 
                     return true;
                 }
-                // 发送异步请求，并直接返回同步响应。
+                // 发送同步请求，并直接返回同步响应。
                 // 调用了第一个版本的 send 函数，并通过 rsp_future.get() 获取异步请求的结果。
                 bool send(const BaseConnection::ptr &conn, const BaseMessage::ptr &req, BaseMessage::ptr &rsp) {
                     AsyncResponse rsp_future;

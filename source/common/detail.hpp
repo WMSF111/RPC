@@ -23,7 +23,7 @@ namespace bitrpc
 #define LINF 1
 #define LERR 2
 
-#define LDEFAULT LDBG
+#define LDEFAULT LDBG //设置从LDEFAULT到2的消息可看到
 
 #define LOG(level, format, ...) {\
     if(level >= LDEFAULT){\
@@ -36,9 +36,9 @@ namespace bitrpc
 }//宏定义后面带##是为了可以省略该逗号及后面的参数
 
 //为每种等级建立不同日志，方便后期显示
-#define DLOG(formt, ...) LOG(LDBG, formt, ##__VA_ARGS__)
-#define ILOG(formt, ...) LOG(LINF, formt, ##__VA_ARGS__)
-#define ELOG(formt, ...) LOG(LERR, formt, ##__VA_ARGS__)
+#define DLOG(formt, ...) LOG(LDBG, formt, ##__VA_ARGS__);
+#define ILOG(formt, ...) LOG(LINF, formt, ##__VA_ARGS__);
+#define ELOG(formt, ...) LOG(LERR, formt, ##__VA_ARGS__);
 
     class JsonUtil
     {

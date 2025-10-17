@@ -2,23 +2,16 @@
 #include "../../common/dispatcher.hpp"
 #include "../../client/rpc_caller.hpp"
 #include "../../client/requestor.hpp"
-// 客户端收到响应
-void onResponceRpc(const bitrpc::BaseConnection::ptr& conn, bitrpc::RpcResponse::ptr& msg){
-    std::cout << "收到了RPC响应" << std::endl;
-    std::string body = msg->serialize(); // 解析成string数据
-    std::cout << body<< std::endl;
-}
 
-void onResponceTopic(const bitrpc::BaseConnection::ptr& conn, bitrpc::TopicResponse::ptr& msg){
-    std::cout << "收到了TOPIC响应" << std::endl;
-    std::string body = msg->serialize(); // 解析成string数据
-    std::cout << body<< std::endl;
+void callback(const Json::Value& result)
+{
+    ILOG("callback_result: %d", result.asInt());
 }
 
 int main()
 {
 //一、构造请求及映射
-    // 1.初始化客户端请求对象
+    // 1.初始化客户端请求对象(构造对象)
     auto requestor = std::make_shared<bitrpc::client::Requestor>(); 
     // 2.初始化客户端rpc请求对象(针对requestor)
     auto caller = std::make_shared<bitrpc::client::RpcCaller>(requestor);
@@ -48,6 +41,23 @@ int main()
     //4. caller发送请求
     bool ret = caller->call(conn,"Add",params,result);
     if(ret != false) std::cout<< "result: "<< result.asInt() << std::endl;
+
+    bitrpc::client::RpcCaller::JsonAsyncResponse res_future;
+    params["num1"] = 33;
+    params["num2"] = 44;
+    //4. caller发送请求
+    ret = caller->call(conn,"Add",params,res_future);
+    if(ret != false)
+    {
+        result = res_future.get();
+        std::cout<< "result: "<< result.asInt() << std::endl;
+    } 
+
+    params["num1"] = 55;
+    params["num2"] = 66;
+    //4. caller发送请求
+    ret = caller->call(conn,"Add", params, callback);
+    std::this_thread::sleep_for(std::chrono::seconds(1));
     client->shutdown();
     return 0;
 }
