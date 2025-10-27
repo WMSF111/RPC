@@ -1,6 +1,19 @@
 #pragma once
 
 /*管理服务端注册和发现请求
+class ProviderManager ：服务提供者管理
+    addProvider ：增加提供者
+    getProvider ：获取提供者信息（提供者断连）
+    delProvider ：删除提供者信息（提供者断连）
+    methodHosts ：返回方法对应提供者HOST
+class DiscovererManager：发现者管理
+    Discoverer::ptr addDiscoverer ：新增发现者
+    delDiscoverer ：删除发现者信息（提供者断连）
+    onlineNotify ：上线通知（新的提供者上线）
+    offlineNotify ：下线通知（提供者下线）
+class PDManager ：注册发现管理（外部可连）
+    onServiceRequest ：服务请求操作（注册、发现）
+    onConnShutdown ：链接断开
 
 */
 
@@ -72,6 +85,18 @@ namespace bitrpc{
                         providers.erase(it->second); //提供者列表中删除该提供者
                     }
                     _conns.erase(it); //删除连接与服务提供者的关联关系
+                }
+                std::vector<Address> methodHosts(const std::string &method) {
+                    std::unique_lock<std::mutex> lock(_mutex);
+                    auto it = _providers.find(method); //寻找方法的提供者
+                    if (it == _providers.end()) {// 没有该方法的提供者
+                        return std::vector<Address>(); // 返回空的vector
+                    }
+                    std::vector<Address> result; // 有该方法，构造address的vector
+                    for (auto &provider : it->second) { // 构造result
+                        result.push_back(provider->host);
+                    }
+                    return result;
                 }
             private:
                 std::mutex _mutex;
@@ -172,7 +197,7 @@ namespace bitrpc{
                     _discoverers(std::make_shared<DiscovererManager>())
                 {}
                 // 服务请求操作
-                void onServiceRequest(const BaseConnection::ptr &conn,const ServiceRequest::ptr &msg)
+                void onServiceRequest(const BaseConnection::ptr &conn, const ServiceRequest::ptr &msg)
                 {
                     //服务操作请求：服务注册/服务发现/
                     ServiceOptype optype = msg->optype(); //获取服务类型
@@ -182,14 +207,16 @@ namespace bitrpc{
                         ILOG("%s:%d 注册服务 %s", msg->host().first.c_str(), msg->host().second, msg->method().c_str());
                         _providers->addProvider(conn, msg->host(), msg->method()); //方法添加提供者
                         _discoverers->onlineNotify(msg->method(), msg->host()); // 给方法订阅发现者上线通知
-                        
+                        return registryResponse(conn, msg); //发送注册响应
                     } else if (optype == ServiceOptype::SERVICE_DISCOVERY){
                         //服务发现：
                         //  1. 新增服务发现者
                         ILOG("客户端要进行 %s 服务发现！", msg->method().c_str());
                         _discoverers->addDiscoverer(conn, msg->method()); // 添加对某method的发现者
+                        return discoveryResponse(conn, msg);//发送发现响应
                     }else {
                         ELOG("收到服务操作请求，但是操作类型错误！");
+                        return errorResponse(conn, msg); //发送错误响应
                     }
                 }
                 void onConnShutdown(const BaseConnection::ptr &conn){ //连接断开
@@ -202,6 +229,41 @@ namespace bitrpc{
                         _providers->delProvider(conn); // 删除该链接对应提供者，直接返回
                     }
                     _discoverers->delDiscoverer(conn); //如果是发现者，直接删除发现者即可，不需要通知
+                }
+            private:
+                 void errorResponse(const BaseConnection::ptr &conn, const ServiceRequest::ptr &msg) {
+                    auto msg_rsp = MessageFactory::create<ServiceResponse>();
+                    msg_rsp->setID(msg->rid());
+                    msg_rsp->setMtype(MType::RSP_SERVICE);
+                    msg_rsp->setRCode(RCode::RCODE_INVALID_OPTYPE);
+                    msg_rsp->setOptype(ServiceOptype::SERVICE_UNKNOW); //未知服务
+                    conn->send(msg_rsp);
+                }
+                //服务注册响应
+                void registryResponse(const BaseConnection::ptr &conn, const ServiceRequest::ptr &msg) {
+                    auto msg_rsp = MessageFactory::create<ServiceResponse>();
+                    msg_rsp->setID(msg->rid());
+                    msg_rsp->setMtype(MType::RSP_SERVICE);
+                    msg_rsp->setRCode(RCode::RCODE_OK);
+                    msg_rsp->setOptype(ServiceOptype::SERVICE_REGISTRY);
+                    conn->send(msg_rsp);
+                }
+                void discoveryResponse(const BaseConnection::ptr &conn, const ServiceRequest::ptr &msg) {
+                    auto msg_rsp = MessageFactory::create<ServiceResponse>();
+                    msg_rsp->setID(msg->rid());
+                    msg_rsp->setMtype(MType::RSP_SERVICE);
+                    msg_rsp->setOptype(ServiceOptype::SERVICE_DISCOVERY);
+                    // 获取提供者信息
+                    std::vector<Address> hosts = _providers->methodHosts(msg->method());
+                    if (hosts.empty()) { // 如果无人提供
+                        msg_rsp->setRCode(RCode::RCODE_NOT_FOUND_SERVICE); //设置CODE为错误
+                        return conn->send(msg_rsp);
+                    }   
+                    // 有人提供
+                    msg_rsp->setRCode(RCode::RCODE_OK);
+                    msg_rsp->setMethod(msg->method());
+                    msg_rsp->setHost(hosts);
+                    return conn->send(msg_rsp);
                 }
             private:
                 ProviderManager::ptr _providers;
