@@ -28,7 +28,7 @@ namespace bitrpc{
                     std::promise<BaseMessage::ptr> response; // 异步响应
                 };
                 
-                //接收到响应的回调函数
+                // 接收到响应的回调函数
                 // 这个回调函数信息类型为BaseMessage
                 void onResponse(const BaseConnection::ptr &conn, BaseMessage::ptr &msg)
                 {
