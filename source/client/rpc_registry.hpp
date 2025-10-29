@@ -92,6 +92,7 @@ namespace bitrpc {
         };
         class Discoverer {
             public:
+                // 提供者下线后的回调接口
                 using OfflineCallback = std::function<void(const Address&)>;
                 using ptr = std::shared_ptr<Discoverer>;
                 Discoverer(const Requestor::ptr &requestor, const OfflineCallback &cb) : 
@@ -167,7 +168,7 @@ namespace bitrpc {
                             return;
                         }
                         it->second->removeHost(msg->host());
-                        _offline_callback(msg->host());
+                        _offline_callback(msg->host()); //收到下辖通知，调用下线回调函数
                     }
                 }
             private:
