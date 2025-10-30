@@ -4,6 +4,19 @@ class RegistryClient：客户端注册对象
     registryMethod ：向外提供的服务注册接口
     参数：_requestor：请求对象、_provider：服务提供对象、_dispatcher：消息分发对象、_client：客户端对象;
 class DiscoveryClient：客户端发现对象
+    bool serviceDiscovery：发现对应method的对象（host）
+    参数：_requestor + _discoverer + _dispatcher、_client：客户端对象;
+class RpcClient：RPC对象
+    bool call：_caller的同步、异步、回调发送rpc请求
+    provite:
+        BaseClient::ptr newClient：实例化一个client
+        BaseClient::ptr getClient：获取对应主机client
+        BaseClient::ptr getClient：获取对应方法client
+        void putClient：_rpc_clients插入新client
+        void delClient：_rpc_clients删除对应client
+    参数：_enableDiscovery + _discovery_client（启用服务发现） + _rpc_client（未启用）;
+         _requestor + _caller（发送rpc请求的对象） + _dispatcher;
+         _mutex + _rpc_clients：用于服务发现的客户端连接池
 */
 
 #include "../common/dispatcher.hpp"
@@ -13,7 +26,7 @@ class DiscoveryClient：客户端发现对象
 
 namespace bitrpc {
     namespace client {
-        class RegistryClient {
+        class RegistryClient { //客户端注册对象
             public:
                 using ptr = std::shared_ptr<RegistryClient>;
                 //构造函数传入注册中心的地址信息，用于连接注册中心
@@ -45,7 +58,7 @@ namespace bitrpc {
                 BaseClient::ptr _client;
         };
 
-        class DiscoveryClient {
+        class DiscoveryClient { // 客户端发现对象
             public:
                 using ptr = std::shared_ptr<DiscoveryClient>;
                 //构造函数传入注册中心的地址信息，用于连接注册中心
@@ -53,6 +66,7 @@ namespace bitrpc {
                     _requestor(std::make_shared<Requestor>()),
                     _discoverer(std::make_shared<client::Discoverer>(_requestor, cb)),
                     _dispatcher(std::make_shared<Dispatcher>()){
+                    //1.响应+分发回调函数绑定
                     // 将_requestor绑定Requestor的onResponse，接收到请求响应后调用请求回调
                     auto rsp_cb = std::bind(&client::Requestor::onResponse, _requestor.get(), 
                         std::placeholders::_1, std::placeholders::_2);
@@ -68,6 +82,7 @@ namespace bitrpc {
                     // 将_dispatcher绑定Dispatcher的onMessage，接收到分发响应后调用分发回调
                     auto message_cb = std::bind(&Dispatcher::onMessage, _dispatcher.get(), 
                         std::placeholders::_1, std::placeholders::_2);
+                    // 2.链接_client对象
                     _client = ClientFactory::create(ip, port);
                     _client->setMessageCallback(message_cb);
                     _client->connect();
@@ -124,6 +139,7 @@ namespace bitrpc {
                     //3. 通过客户端连接，发送rpc请求
                     return _caller->call(client->connection(), method, params, result);
                 }
+                // 异步调用
                 bool call(const std::string &method, const Json::Value &params, RpcCaller::JsonAsyncResponse &result) {
                     BaseClient::ptr client = getClient(method);
                     if (client.get() == nullptr) {
@@ -132,6 +148,7 @@ namespace bitrpc {
                     //3. 通过客户端连接，发送rpc请求
                     return _caller->call(client->connection(), method, params, result);
                 }
+                //回调函数调用
                 bool call(const std::string &method, const Json::Value &params, const RpcCaller::JsonResponseCallback &cb) {
                     BaseClient::ptr client = getClient(method);
                     if (client.get() == nullptr) {

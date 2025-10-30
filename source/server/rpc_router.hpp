@@ -147,7 +147,7 @@ namespace bitrpc{
                 std::unordered_map<std::string, ServiceDescribe::ptr> _services;// 提供的服务描述
         };
 
-        class RpcRouter{  // 用于跟其他模块耦合的模块
+        class RpcRouter{  // 用于RPC跟其他模块耦合的模块
             //服务注册、rpc请求回调函数
             public:
                 using ptr = std::shared_ptr<RpcRouter>;

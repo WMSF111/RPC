@@ -98,7 +98,7 @@ namespace bitrpc {
                 Discoverer(const Requestor::ptr &requestor, const OfflineCallback &cb) : 
                     _requestor(requestor), _offline_callback(cb){}
                 bool serviceDiscovery(const BaseConnection::ptr &conn, const std::string &method, Address &host) {
-                    {//当前所保管的提供者信息存在（已经发现过了），则直接返回地址
+                    {//conn进行method类的host，host赋值
                         std::unique_lock<std::mutex> lock(_mutex);
                         //查找method对应地址，并设置host
                         auto it = _method_hosts.find(method);
