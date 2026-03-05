@@ -1,20 +1,32 @@
 #pragma once
+/* 消息协议的详细实现层， 基于 JSON 格式的各种请求和响应消息类
+MessageJson (JSON 消息基类)：继承自BaseMessage，_body对象（Json::Value），存储实际的 JSON 数据。
+JsonRequest（Json请求类）：继承自MessageJson
+JsonResponse（Json响应类）：继承自MessageJson，拥有函数：check()、rcode()、setRCode(RCode rcode)
+RpcRequest（Rpc请求请求类）：继承自JsonRequest，函数：check()、method()、setMethod(const std::string &method_name)、params()、setParams(const Json::Value &params)
+TopicRequest（主题请求类）: 继承自JsonRequest，需要TOPIC、OPTYPE、TOPIC_MSG（只有主题发布需要）
+ServiceRequest（服务请求类）: 继承自JsonRequest，需要METHOD、OPTYPE、HOST（只有SERVICE_DISCOVERY不需要）
+RpcResponse（RPC响应类）: 继承自JsonResponse，需要RESULT
+TopicResponse（主题相应类）：继承自JsonResponse
+ServiceResponse（服务响应）: 继承自JsonResponse，需要RCODE、OPTYPE、METHOD、HOST，注册、上线、下线，发现
+MessageFactory（消息对象工厂）：输入Mtype，返回BaseMessage
+*/
 #include"detail.hpp"
 #include"fieIds.hpp"
 #include"abstract.hpp"
 
 namespace bitrpc{
-    typedef std::pair<std::string, int> Address;
+    typedef std::pair<std::string, int> Address; // 设置Add对，IP和port
     class MessageJson : public BaseMessage{ // Message类
         public:
             using ptr = std::shared_ptr<MessageJson>;
             virtual std::string serialize() override{ // 检查格式是否合格
                 std::string body;
-                bool ret = JsonUtil::serialize(_body, body);
+                bool ret = JsonUtil::serialize(_body, body); // JSON转string
                 if(ret == false) return std::string(); //返回一个空的字符串
                 return body;
             } 
-            virtual bool unserialize(const std::string &msg) override{
+            virtual bool unserialize(const std::string &msg) override{// string 转JSON
                 return JsonUtil::unserialize(_body, msg); 
             }; 
         protected:
@@ -42,10 +54,10 @@ namespace bitrpc{
                 }
                 return true;
             }
-            virtual RCode rcode() {
+            virtual RCode rcode() { // 获取响应状态码
                 return (RCode)_body[KEY_RCODE].asInt();
             }
-            virtual void setRCode(RCode rcode) {
+            virtual void setRCode(RCode rcode) { // 设置响应状态码
                 _body[KEY_RCODE] = (int)rcode;
             }
     };
@@ -54,7 +66,7 @@ namespace bitrpc{
     class RpcRequest : public JsonRequest{ 
         public:
             using ptr = std::shared_ptr<RpcRequest>;
-            virtual bool check() override {
+            virtual bool check() override { // 检查请求方法和参数信息
                 // rpc请求中，包含请求方法名称-字符串，参数字段-对象
                 if (_body[KEY_METHOD].isNull() == true ||
                     _body[KEY_METHOD].isString() == false) {
@@ -68,16 +80,16 @@ namespace bitrpc{
                 }
                 return true;
             }
-            std::string method() {
+            std::string method() {  // 获取Rpc请求方法
                 return _body[KEY_METHOD].asString();
             }
-            void setMethod(const std::string &method_name) {
+            void setMethod(const std::string &method_name) { // 设置Rpc请求方法
                 _body[KEY_METHOD] = method_name;
             }
-            Json::Value params() {
+            Json::Value params() { // 获取Rpc请求参数
                 return _body[KEY_PARAMS];
             }
-            void setParams(const Json::Value &params) {
+            void setParams(const Json::Value &params) { // 设置Rpc请求参数
                 _body[KEY_PARAMS] = params;
             }
     };
@@ -88,7 +100,7 @@ namespace bitrpc{
         public:
             using ptr = std::shared_ptr<TopicRequest>;
             virtual bool check() override {
-                //rpc请求中，包含请求方法名称-字符串，参数字段-对象
+                // rpc请求中，包含请求方法名称-字符串，参数字段-对象
                 if (_body[KEY_TOPIC_KEY].isNull() == true ||
                     _body[KEY_TOPIC_KEY].isString() == false) {
                     ELOG("主题请求中没有主题名称或主题名称类型错误！");
@@ -108,22 +120,22 @@ namespace bitrpc{
                 return true;
             }
             
-            std::string topicKey() {
+            std::string topicKey() { // 获取TOPIC请求的主题
                 return _body[KEY_TOPIC_KEY].asString();
             }
-            void setTopicKey(const std::string &key) {
+            void setTopicKey(const std::string &key) { // 设置TOPIC请求的主题
                 _body[KEY_TOPIC_KEY] = key;
             }
-            TopicOptype optype() {
+            TopicOptype optype() { // 获取TOPIC请求的主题操作类型
                 return (TopicOptype)_body[KEY_OPTYPE].asInt();
             }
-            void setOptype(TopicOptype optype) {
+            void setOptype(TopicOptype optype) { // 设置TOPIC请求的主题操作类型
                 _body[KEY_OPTYPE] = (int)optype;
             }
-            std::string topicMsg() {
+            std::string topicMsg() { // 获取TOPIC请求的主题操作信息
                 return _body[KEY_TOPIC_MSG].asString();
             }
-            void setTopicMsg(const std::string &msg) {
+            void setTopicMsg(const std::string &msg) {// 设置TOPIC请求的主题操作信息
                 _body[KEY_TOPIC_MSG] = msg;
             }
 
@@ -165,7 +177,7 @@ namespace bitrpc{
             void setMethod(const std::string &name) {
                 _body[KEY_METHOD] = name;
             }
-            ServiceOptype optype() { // 主题操作类型,ServiceOptype，用于代指不同操作
+            ServiceOptype optype() { // 获取主题操作类型,ServiceOptype，用于代指不同操作
                 return (ServiceOptype)_body[KEY_OPTYPE].asInt();
             }
             void setOptype(ServiceOptype optype) {
@@ -178,7 +190,7 @@ namespace bitrpc{
                 return addr;
             }
             void setHost(const Address &host) { // 将pair的Address赋值给HOST
-                Json::Value val;
+                Json::Value val; 
                 val[KEY_HOST_IP] = host.first;
                 val[KEY_HOST_PORT] = host.second;
                 _body[KEY_HOST] = val;
@@ -197,6 +209,7 @@ namespace bitrpc{
                 }
                 return true;
             }
+
             Json::Value result() {
                 return _body[KEY_RESULT];
             }
@@ -218,7 +231,7 @@ namespace bitrpc{
             virtual bool check() override {
                 if (_body[KEY_OPTYPE].isNull() == true ||
                     _body[KEY_OPTYPE].isIntegral() == false) {
-                    ELOG("响应中没有操作类型,或操作类型的类型错误！");
+                    ELOG("响应中没有操作类型, 或操作类型的类型错误！");
                     return false;
                 }
                 if (_body[KEY_OPTYPE].asInt() == (int)(ServiceOptype::SERVICE_DISCOVERY) &&
@@ -231,13 +244,13 @@ namespace bitrpc{
                 }
                 return true;
             }
-            ServiceOptype optype() {
+            ServiceOptype optype() { // 服务类型
                 return (ServiceOptype)_body[KEY_OPTYPE].asInt();
             }
             void setOptype(ServiceOptype optype) {
                 _body[KEY_OPTYPE] = (int)optype;
             }
-            std::string method() {
+            std::string method() { //服务方法
                 return _body[KEY_METHOD].asString();
             }
             void setMethod(const std::string &method) {
@@ -245,14 +258,14 @@ namespace bitrpc{
             }
             //因为ServiceResponse可能会有多个服务器
             void setHost(std::vector<Address> addrs) {
-                for (auto &addr : addrs) { // 循环设置HOST
+                for (auto &addr : addrs) { // 循环设置HOST对象
                     Json::Value val;
                     val[KEY_HOST_IP] = addr.first;
                     val[KEY_HOST_PORT] = addr.second;
                     _body[KEY_HOST].append(val);
                 }
             }
-            std::vector<Address> hosts() { //循环获取装着pair的Addres的vector
+            std::vector<Address> hosts() { //循环获取Host，转化为装着pair的Addres的vector
                 std::vector<Address> addrs;
                 int sz = _body[KEY_HOST].size(); 
                 for (int i = 0; i < sz; i++) {

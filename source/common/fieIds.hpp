@@ -1,10 +1,11 @@
 #pragma once
+/* 定义了通信双方（客户端和服务端）必须遵守的数据标准、消息格式和状态码。*/
 #include<iostream>
 #include<string>
 #include<unordered_map>
 
-
 namespace bitrpc{
+    // 用于序列化和反序列化
     #define KEY_METHOD "method"
     #define KEY_PARAMS "parameters"
     #define KEY_TOPIC_KEY "topic_key"
@@ -16,6 +17,7 @@ namespace bitrpc{
     #define KEY_RCODE "rcode"
     #define KEY_RESULT "result"
 
+    // 定义了系统能够处理的三大类业务逻辑
     enum class MType {
         REQ_RPC = 0,
         RSP_RPC,
@@ -25,6 +27,7 @@ namespace bitrpc{
         RSP_SERVICE
     };  
 
+    // 定义统一的“状态码”与错误处理
     enum class RCode { // 响应码类型定义 
         RCODE_OK = 0,
         RCODE_PARSE_FAILED,
@@ -55,7 +58,7 @@ namespace bitrpc{
         if (it == err_map.end()) return "未知错误！";
         return it->second;
     }
-    
+    // 定义 RPC 的“调用方式”
     enum class RType { //RPC请求类型定义 
         REQ_ASYNC = 0, // 异步请求：返回异步对象，在需要的时候通过异步对象获取响应结果（还未收到结果会阻塞）
         REQ_CALLBACK // 回调请求：设置回调函数，通过回调函数对响应进⾏处理

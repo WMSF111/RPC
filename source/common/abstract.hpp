@@ -1,4 +1,12 @@
 #pragma once
+/* 定义各种基类：
+BaseMessage：消息类
+BaseBuffer：缓存类
+BaseProtocol：通信协议类
+BaseConnection：通讯连接类
+class BaseServer：服务端抽象类
+BaseClient：客户端抽象类
+*/
 #include<memory>
 #include<functional>
 #include "fieIds.hpp"
@@ -9,18 +17,19 @@ namespace bitrpc{
             // 用于管理动态分配的内存资源（堆内存），并且通过引用计数机制来自动控制内存的释放。
             using ptr = std::shared_ptr<BaseMessage>;  // 用ptr代表共享指针，方便管理
             virtual ~BaseMessage(){} //析构,声明需要分号，定义不需要
-            virtual void setID(const std::string &id){ _rid = id;} // 大对象一般使用const+&
-            virtual std::string rid(){return _rid;}
-            virtual void setMtype(MType mtype){_mtype = mtype;} // 小对象且可更改，会有个mtype副本
+            virtual void setID(const std::string &id){ _rid = id;} // 设置消息类ID
+            // 大对象一般使用const+&
+            virtual std::string rid(){return _rid;} // 获取ID
+            virtual void setMtype(MType mtype){_mtype = mtype;} // 设置消息类型
+            // 小对象且可更改，会有个mtype副本
             virtual MType mtype(){return _mtype;}
-            // 功能
             // =0 意味着这些函数没有提供实现，而是要求派生类必须提供它们的具体实现。
             virtual std::string serialize() = 0; 
             virtual bool unserialize(const std::string &msg) = 0; 
             virtual bool check() = 0; 
         private:
-            MType _mtype;
-            std::string _rid;
+            MType _mtype; // 标记请求类型
+            std::string _rid; // 将请求和响应对应起来
     };
 
     class BaseBuffer{ //缓存类
@@ -69,9 +78,9 @@ namespace bitrpc{
             }
             virtual void start() = 0; 
         protected:
-            ConnectionCallback _cb_connection;
-            CloseCallback _cb_close;
-            MessageCallback _cb_message;
+            ConnectionCallback _cb_connection; // 当有新连接建立或断开时，调用谁？
+            CloseCallback _cb_close; // 连接关闭时，调用谁？
+            MessageCallback _cb_message; // 当收到新消息时，调用哪个函数去处理业务逻辑？
     };
 
     class BaseClient { //客户端抽象类
