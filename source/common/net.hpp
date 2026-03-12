@@ -299,8 +299,8 @@ namespace bitrpc{
             using ptr = std::shared_ptr<MuduoClient>;
             MuduoClient(const std::string &sip, int sport):
                 _protocol(ProtocolFactory::create()),
-                _baseloop(_loopthread.startLoop()),
-                _downlatch(1), //初始化计数器为1，因为为0时才会唤醒
+                _baseloop(_loopthread.startLoop()), //baseloop需要thread 才能运行
+                _downlatch(1), //初始化计数器为1，因为为0时才会唤醒等待的线程
                 _client(_baseloop, muduo::net::InetAddress(sip, sport), "MuduoClient"){}
             virtual void connect() override {
                 DLOG("设置回调函数，连接服务器");
